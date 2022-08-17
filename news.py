@@ -4,17 +4,16 @@ from unittest import result
 import streamlit as st
 import requests
 #import pycountry
-#from newsapi import api
+from newsapi import api
 from streamlit_lottie import st_lottie
 import json
 from streamlit_option_menu import option_menu
 
-import os
-from dotenv import load_dotenv
+#import os
+#from dotenv import load_dotenv
 
-load_dotenv()
-
-api = os.getenv("api")
+#load_dotenv()
+#api = os.getenv("api")
 
 
 st.set_page_config(layout="wide")
