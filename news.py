@@ -4,10 +4,17 @@ from unittest import result
 import streamlit as st
 import requests
 #import pycountry
-from newsapi import api
+#from newsapi import api
 from streamlit_lottie import st_lottie
 import json
 from streamlit_option_menu import option_menu
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+api = os.getenv("api")
 
 
 st.set_page_config(layout="wide")
@@ -17,7 +24,7 @@ st.markdown("<h1 style='text-align: center; color:red;'>PY NEWS</h1>", unsafe_al
 selected = option_menu(
                 menu_title=None,  # required
                 options=["Headlines", "Technology", "Trump", "Crypto"],  
-                icons=["🌎", "🏀", "👨🏾‍⚖️", "💹"],  
+                icons=["🌎", "🌎", "🌎", "🌎"],  
                 #menu_icon="cast",  
                 default_index=0,  
                 orientation="horizontal",
