@@ -9,12 +9,6 @@ from streamlit_lottie import st_lottie
 import json
 from streamlit_option_menu import option_menu
 
-#import os
-#from dotenv import load_dotenv
-
-#load_dotenv()
-#api = os.getenv("api")
-
 
 st.set_page_config(layout="wide")
 
@@ -150,18 +144,3 @@ hide_st_style = """
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
