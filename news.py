@@ -1,41 +1,128 @@
 import streamlit as st
 import requests
+import logging
 from streamlit_lottie import st_lottie
 import json
 from streamlit_option_menu import option_menu
 
-# --- PAGE CONFIG ---
+# --- CONFIGURATION ---
+logging.basicConfig(filename='news_app.log', level=logging.ERROR)
 st.set_page_config(
-    page_title="PY NEWS - Enhanced Edition",
+    page_title="PY NEWS - Pro Edition",
     layout="wide",
     page_icon="📰",
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS STYLING ---
+# --- EMBEDDED CSS ---
 st.markdown("""
 <style>
 :root {
-    --primary-red: #BB1919;
-    --nav-bg: #121212;
-    --card-hover: #F8F8F8;
+    --primary-red: #FF4B4B;
+    --nav-bg: #1E1E1E;
+    --card-bg: #FFFFFF;
+    --text-dark: #2C3333;
+    --text-light: #F4F4F4;
 }
 
+/* Main title */
+.main-title {
+    color: var(--primary-red) !important;
+    text-align: center;
+    margin: 1rem 0 0.5rem !important;
+    font-size: 3rem !important;
+}
+
+/* Category headers */
+.category-title {
+    color: var(--text-dark);
+    margin: 1.5rem 0 !important;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-red);
+}
+
+/* News images */
+.news-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    border-radius: 8px;
+    transition: transform 0.2s ease;
+}
+
+.news-image:hover {
+    transform: scale(1.02);
+}
+
+/* Article metadata */
+.metadata {
+    margin-bottom: 0.75rem;
+}
+
+.category-tag {
+    background: var(--primary-red);
+    color: white !important;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+}
+
+.timestamp {
+    color: #666;
+    font-size: 0.85rem;
+}
+
+/* Article content */
+.article-title {
+    margin: 0 !important;
+    font-size: 1.4rem !important;
+}
+
+.article-title a {
+    color: inherit !important;
+    text-decoration: none !important;
+}
+
+.article-desc {
+    color: #444;
+    margin: 0.5rem 0 !important;
+    line-height: 1.6 !important;
+}
+
+.article-meta {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0.75rem 0;
+}
+
+/* Story button */
+.story-button {
+    display: inline-block;
+    background: var(--primary-red);
+    color: white !important;
+    padding: 0.5rem 1.5rem;
+    border-radius: 25px;
+    text-decoration: none !important;
+    transition: all 0.2s ease;
+    margin: 1rem 0;
+}
+
+.story-button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* Navbar styling */
 [data-testid="stHorizontalBlock"] {
-    background: var(--nav-bg);
+    background: var(--nav-bg) !important;
     padding: 0.5rem 1rem !important;
     border-radius: 0 0 15px 15px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 
-.st-c7 {
+[data-testid="stHorizontalBlock"] .st-c7 {
     font-weight: 500 !important;
-    letter-spacing: 0.5px;
-}
-
-[data-testid="stHorizontalBlock"] .st-c7:hover {
-    transform: translateY(-2px);
-    transition: all 0.2s ease;
+    transition: all 0.2s ease !important;
 }
 
 [data-testid="stHorizontalBlock"] .st-c7[aria-selected="true"] {
@@ -43,53 +130,27 @@ st.markdown("""
     border-radius: 8px !important;
 }
 
-.lottie-container {
-    margin: -2rem 0 1rem 0;
-}
-
-.news-card {
-    border-bottom: 1px solid #eee;
-    padding: 1.5rem 0;
-    transition: all 0.3s ease;
-}
-
-.news-card:hover {
-    background: var(--card-hover);
-    padding-left: 1rem !important;
-}
-
-.news-image {
-    width: 100%;
-    height: 160px;
-    object-fit: cover;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    cursor: pointer;
-    border: none;
-}
-
-.timestamp {
-    color: #666;
-    font-size: 0.85rem;
-    margin: 0.3rem 0;
-}
-
-.category-tag {
-    background: var(--primary-red);
-    color: white !important;
-    padding: 0.3rem 0.7rem;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    display: inline-block;
-    margin: 0.2rem 0.5rem 0.2rem 0;
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .news-image {
+        height: 120px;
+    }
+    
+    .main-title {
+        font-size: 2rem !important;
+    }
+    
+    .article-title {
+        font-size: 1.2rem !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SECRETS MANAGEMENT ---
+# --- SECRETS & API ---
 try:
     API_KEY = st.secrets["newsapi_key"]
-except:
+except KeyError:
     st.error("""
         **Configuration Required**  
         Create `.streamlit/secrets.toml` with:  
@@ -99,7 +160,73 @@ except:
     """)
     st.stop()
 
-# --- TOPIC MAPPING ---
+# --- CACHED DATA FETCHER ---
+@st.cache_data(ttl=60*5, show_spinner=False)
+def fetch_news_cached(topic: str, search_query=None):
+    try:
+        if search_query:
+            url = f"https://newsapi.org/v2/everything?q={search_query}&apiKey={API_KEY}"
+        else:
+            url = f"{TOPICS[topic]['url']}&apiKey={API_KEY}"
+        
+        with st.spinner("📡 Fetching latest news..."):
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            return response.json().get("articles", [])
+    
+    except requests.exceptions.RequestException as req_err:
+        logging.error(f"Request Error: {str(req_err)}")
+        st.error(f"📡 Network error: {str(req_err).split('(')[0]}")
+    except KeyError as key_err:
+        logging.error(f"Key Error: {str(key_err)}")
+        st.error(f"🔑 Missing data: {str(key_err)}")
+    except Exception as e:
+        logging.error(f"Unexpected Error: {str(e)}")
+        st.error(f"⚠️ An unexpected error occurred")
+    return []
+
+# --- MODULAR COMPONENTS ---
+def display_metadata(article, topic):
+    st.markdown(
+        f"<div class='metadata'>"
+        f"<span class='category-tag'>{topic}</span>"
+        f"<span class='timestamp'>{article.get('publishedAt', '')[:10]}</span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+
+def display_image(article):
+    img_url = article.get("urlToImage", "https://via.placeholder.com/800x450?text=No+Image")
+    story_url = article.get("url", "#")
+    return st.markdown(
+        f"<a href='{story_url}' target='_blank' aria-label='Open story'>"
+        f"<img class='news-image' src='{img_url}' loading='lazy' alt='{article.get('title', 'News story image')}'>"
+        f"</a>",
+        unsafe_allow_html=True
+    )
+
+def display_content(article):
+    story_url = article.get("url", "#")
+    st.markdown(
+        f"<h3 class='article-title'>"
+        f"<a href='{story_url}' target='_blank'>{article.get('title', 'Untitled')}</a>"
+        f"</h3>",
+        unsafe_allow_html=True
+    )
+    
+    desc = article.get("description", "No description available")
+    st.markdown(f"<p class='article-desc'>{desc}</p>", unsafe_allow_html=True)
+    
+    author = article.get("author", "Unknown Author")
+    source = article.get("source", {}).get("name", "Unknown Source")
+    st.markdown(
+        f"<div class='article-meta'>"
+        f"📝 {author} | 🏢 {source}"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+
+# --- TOPICS CONFIG ---
 TOPICS = {
     "Headlines": {
         "url": "https://newsapi.org/v2/top-headlines?country=us&pageSize=50",
@@ -107,11 +234,11 @@ TOPICS = {
     },
     "World": {
         "url": "https://newsapi.org/v2/top-headlines?category=general&pageSize=50",
-        "icon": "globe-americas"
+        "icon": "globe"
     },
     "Business": {
         "url": "https://newsapi.org/v2/top-headlines?category=business&pageSize=50",
-        "icon": "graph-up"
+        "icon": "briefcase"
     },
     "Tech": {
         "url": "https://newsapi.org/v2/everything?domains=techcrunch.com&pageSize=50",
@@ -129,13 +256,9 @@ TOPICS = {
         "url": "https://newsapi.org/v2/top-headlines?category=sports&pageSize=50",
         "icon": "trophy"
     },
-    "Entertainment": {
-        "url": "https://newsapi.org/v2/top-headlines?category=entertainment&pageSize=50",
-        "icon": "film"
-    },
     "Politics": {
         "url": "https://newsapi.org/v2/everything?q=politics&pageSize=50",
-        "icon": "building"
+        "icon": "bank"
     }
 }
 
@@ -147,141 +270,55 @@ selected_topic = option_menu(
     default_index=0,
     orientation="horizontal",
     styles={
-        "container": {
-            "padding": "0.5rem",
-            "background-color": "var(--nav-bg)",
-            "border-radius": "0 0 15px 15px"
-        },
-        "icon": {
-            "color": "rgba(255,255,255,0.7)", 
-            "font-size": "16px",
-            "margin-right": "8px"
-        },
+        "container": {"padding": "0!important", "background": "var(--nav-bg)"},
+        "icon": {"color": "#FF4B4B", "font-size": "16px"},
         "nav-link": {
             "font-size": "14px",
-            "text-align": "left",
             "margin": "0 0.5rem",
-            "padding": "0.5rem 1rem",
-            "border-radius": "8px",
+            "padding": "0.75rem 1rem",
             "transition": "all 0.2s ease",
-            "--hover-color": "rgba(255,255,255,0.1)"
         },
         "nav-link-selected": {
-            "background-color": "var(--primary-red)",
-            "font-weight": "bold",
-            "box-shadow": "0 2px 4px rgba(0,0,0,0.2)"
+            "background": "var(--primary-red)",
+            "box-shadow": "0 2px 8px rgba(255,75,75,0.25)"
         },
-    },
-    key="enhanced-nav"
+    }
 )
 
-# --- TITLE ABOVE LOTTIE ---
-st.markdown("<h1 style='text-align: center; color: var(--primary-red); margin-bottom: 0.5rem;'>PY NEWS</h1>", unsafe_allow_html=True)
+# --- HEADER ---
+st.markdown("<h1 class='main-title'>PY NEWS</h1>", unsafe_allow_html=True)
 
 # --- LOTTIE ANIMATION ---
 def load_lottie(filepath: str):
-    with open(filepath, "r") as f:
+    with open(filepath) as f:
         return json.load(f)
 
-st.markdown("<div class='lottie-container'>", unsafe_allow_html=True)
-lottie_news = load_lottie("news2.json")
-st_lottie(lottie_news, speed=0.5, height=300, loop=True, key="main-lottie")
-st.markdown("</div>", unsafe_allow_html=True)
+st_lottie(load_lottie("news2.json"), speed=0.5, height=300, key="header-anim")
 
-# --- NEWS FETCHER ---
-def fetch_news(topic: str):
-    try:
-        url = f"{TOPICS[topic]['url']}&apiKey={API_KEY}"
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.json().get("articles", [])
-    except Exception as e:
-        st.error(f"🚨 News fetch error: {str(e)}")
-        return []
-
-# --- ARTICLE DISPLAY ---
-def display_article(article: dict):
-    with st.container():
-        col1, col2 = st.columns([1, 3], gap="medium")
-        story_url = article.get("url", "#")
-        with col1:
-            img = article.get("urlToImage", "https://via.placeholder.com/800x450?text=No+Image")
-            # Make image clickable using markdown <a> tag
-            st.markdown(
-                f"<a href='{story_url}' target='_blank'><img class='news-image' src='{img}'></a>",
-                unsafe_allow_html=True
+# --- MAIN APP ---
+with st.container():
+    # Sidebar
+    with st.sidebar:
+        st.markdown("## 🔍 News Search")
+        search_query = st.text_input(
+            "Enter keywords:",
+            placeholder="AI, Climate, Elections...",
+            help="Search across all news categories"
+        )
+        
+        st.markdown("## 🌐 Categories")
+        for topic in TOPICS:
+            st.button(
+                f"{TOPICS[topic]['icon']} {topic}",
+                use_container_width=True,
+                key=f"cat_{topic}"
             )
-        with col2:
-            # Metadata
-            st.markdown(
-                f"<div style='margin-bottom:0.5rem'>"
-                f"<span class='category-tag'>{selected_topic}</span>"
-                f"<span class='timestamp'>{article.get('publishedAt', '')[:10]}</span>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-            # Title
-            title = article.get("title", "Untitled Article")
-            st.markdown(
-                f"<h3 style='margin:0;padding:0;font-size:1.3rem;'>"
-                f"<a href='{story_url}' target='_blank' style='color:inherit;text-decoration:none;'>{title}</a>"
-                f"</h3>",
-                unsafe_allow_html=True
-            )
-            # Description
-            desc = article.get("description", "No description available")
-            st.markdown(
-                f"<p style='color:#666;margin:0.5rem 0;line-height:1.5;'>{desc}</p>", 
-                unsafe_allow_html=True
-            )
-            # Author/Source
-            author = article.get("author", "Unknown Author")
-            source = article.get("source", {}).get("name", "Unknown Source")
-            st.markdown(
-                f"<div style='color:#888;font-size:0.9rem;margin-top:0.5rem;'>"
-                f"📝 {author} | 🏢 {source}"
-                f"</div>",
-                unsafe_allow_html=True
-            )
-            # Continue to story button
-            st.markdown(
-                f"<a href='{story_url}' target='_blank'><button style='background-color: var(--primary-red); color: white; border: none; border-radius: 6px; padding: 0.5rem 1.2rem; margin-top: 0.7rem; cursor: pointer;'>Continue to story</button></a>",
-                unsafe_allow_html=True
-            )
-        st.markdown("<div class='news-card'></div>", unsafe_allow_html=True)
-
-# --- SIDEBAR ---
-with st.sidebar:
-    st.markdown("## 🔍 Search News")
-    search_query = st.text_input("Enter keywords:", placeholder="AI, Climate, Elections...")
-    if search_query:
-        st.info(f"Showing results for: '{search_query}'")
-        search_url = f"https://newsapi.org/v2/everything?q={search_query}&apiKey={API_KEY}"
-        try:
-            articles = requests.get(search_url).json().get("articles", [])
-        except:
-            articles = fetch_news(selected_topic)
-    st.markdown("## 🌐 Top Categories")
-    for topic in TOPICS:
-        st.button(f"{TOPICS[topic]['icon']} {topic}", use_container_width=True)
-
-# --- MAIN CONTENT ---
-st.markdown(f"<h1 style='margin-top:0.5rem;'>{selected_topic} News</h1>", unsafe_allow_html=True)
-
-if not search_query:
-    articles = fetch_news(selected_topic)
-
-if articles:
-    for article in articles[:25]:
-        display_article(article)
-else:
-    st.warning("No articles found. Try another topic or search term.")
-
-# --- FOOTER ---
-st.markdown("---")
-st.markdown(
-    "<div style='text-align:center;color:#666;padding:2rem;font-size:0.9rem;'>"
-    "📰 Powered by NewsAPI | 🚀 Enhanced Streamlit Design"
-    "</div>", 
-    unsafe_allow_html=True
-)
+    
+    # Content
+    st.markdown(f"<h2 class='category-title'>{selected_topic} News</h2>", unsafe_allow_html=True)
+    
+    articles = fetch_news_cached(selected_topic, search_query if search_query else None)
+    
+    if articles:
+        for article in articles[:25]:
+            with st.container():
