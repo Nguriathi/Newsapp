@@ -1,4 +1,4 @@
-text
+
 # PY NEWS
 
 Welcome to **PY NEWS**, a sleek and modern news aggregator web app built with [Streamlit](https://streamlit.io/) that brings you the latest headlines and stories from around the world - all in one place!
