@@ -44,7 +44,6 @@ PY NEWS fetches real-time news articles from various categories using the powerf
 git clone https://github.com/yourusername/py-news.git
 cd py-news
 
-text
 
 2. (Optional) Create and activate a virtual environment:
 
@@ -56,13 +55,11 @@ venv\Scripts\activate
 macOS/Linux
 source venv/bin/activate
 
-text
 
 3. Install dependencies:
 
 pip install -r requirements.txt
 
-text
 
 4. Add your NewsAPI key:
 
@@ -70,7 +67,6 @@ Create a `.streamlit/secrets.toml` file in the project root with:
 
 newsapi_key = "YOUR_NEWSAPI_KEY"
 
-text
 
 Replace `"YOUR_NEWSAPI_KEY"` with your actual key.
 
@@ -82,7 +78,6 @@ Run the app locally with:
 
 streamlit run app.py
 
-text
 
 Open the URL shown in your terminal (usually `http://localhost:8501`).
 
@@ -98,7 +93,6 @@ py-news/
 └── .streamlit/
 └── secrets.toml # API key (not committed)
 
-text
 
 ---
 
@@ -113,7 +107,6 @@ Install all via:
 
 pip install streamlit requests streamlit-lottie streamlit-option-menu
 
-text
 
 ---
 
